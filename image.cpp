@@ -176,8 +176,10 @@ bool Image::isInShadow(const Point &intersection, const Sun &sun) {
     constexpr double bias = 1e-6;
     Vector biasVector = sun.direction * bias;
     Ray shadowRay{intersection + biasVector.getVectorPoint(), sun.direction};
-    Intersection i = getSphereCollision(shadowRay);
-    return i.found;
+    // Intersection i = getSphereCollision(shadowRay);
+    Intersection i;
+    return (intersectBVH(bvh, shadowRay, i));
+    // return i.found;
 }
 
 // color pixel at location

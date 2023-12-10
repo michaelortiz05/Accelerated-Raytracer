@@ -2,6 +2,7 @@
 #include <string>
 #include <sstream>
 #include <typeinfo>  
+#include <chrono>
 #include "image.h"
 #include "lodepng.h"
 
@@ -85,7 +86,11 @@ int main(int argc, char *argv[]) {
     std::cout << "Building BVH..." << std::endl;
     img->createBVH();
     std::cout << "Rendering Scene..." << std::endl;
+    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     img->castRays();
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << 
+        "[μs] (" << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 10e5 << "s)" << std::endl;
     if (img->getName() != "") {
         unsigned error = lodepng::encode(img->getName(), img->getPng(), img->getWidth(), img->getHeight());
         if(error) std::cout << "encoder error " << error << ": "<< lodepng_error_text(error) << std::endl;

@@ -143,7 +143,7 @@ struct CUDA_HOSTDEV Intersection {
     Point center;
 };
 
-// Simple boundign box for bvh nodes
+// Simple bounding box for bvh nodes
 struct CUDA_HOSTDEV BoundingBox {
     Point minCorner, maxCorner;
 
