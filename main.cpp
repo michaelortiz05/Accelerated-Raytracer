@@ -44,11 +44,6 @@ int main(int argc, char *argv[]) {
             if (line.size() != 4 || typeid(line[3]) != typeid(std::string) || !has_suffix(line[3], ".png"))
                 break;
 
-            // revisit this if necessary
-            // if (img.name != "") {
-            //     unsigned error = lodepng::encode(img.name, img.png, img.width, img.height);
-            //     if(error) std::cout << "encoder error " << error << ": "<< lodepng_error_text(error) << std::endl;
-            // }
             img = new Image(std::stoi(line[1]), std::stoi(line[2]), line[3]);
             unsigned error = lodepng::encode(img->getName(), img->getPng(), img->getWidth(), img->getHeight());
             if(error) std::cout << "encoder error " << error << ": "<< lodepng_error_text(error) << std::endl;
@@ -65,7 +60,7 @@ int main(int argc, char *argv[]) {
             double r = std::stof(line[4]);
             
             // Add sphere
-            img->addObject(x,y,z,r);
+            img->addSphere(x,y,z,r);
         }
 
         else if (line[0] == "color") {
@@ -82,7 +77,7 @@ int main(int argc, char *argv[]) {
             double x = std::stof(line[1]);
             double y = std::stof(line[2]);
             double z = std::stof(line[3]);
-            img->setSun(x, y, z);
+            img->addSun(x, y, z);
         }
         
     }

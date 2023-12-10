@@ -7,20 +7,20 @@ std::ostream& operator<<(std::ostream& out, const Color& c) { out << "(" << c.r 
 Image::Image(int w, int h, std::string n): width{w}, height{h}, name{n} {
     png.resize(height * width * 4);
     maxDim = std::max(width, height);
-    currentSun = nullptr;
     eye = new Point;
     forward = new Vector(0, 0, -1);
     right = new Vector(1, 0, 0);
     up = new Vector(0, 1, 0);
+    bvh = nullptr;
 }
 
 // Image deconstructor
 Image::~Image() {
-    delete currentSun;
     delete eye;
     delete forward;
     delete right;
     delete up;
+    delete bvh;
 }
 
 // Height getter
@@ -47,30 +47,30 @@ void Image::setColor(double r, double g, double b, double a) {
 }
 
 // add sphere to list of objects
-void Image::addObject(double x, double y, double z, double r) {
-    objects.push_back(Sphere{Point{x,y,z}, r, this->currentColor});
+void Image::addSphere(double x, double y, double z, double r) {
+    spheres.push_back(Sphere{Point{x,y,z}, r, this->currentColor});
 }
 
-// Set the current sun
-void Image::setSun(double x, double y, double z) {
-    if (currentSun == nullptr) {
-        currentSun = new Sun;
-        currentSun->c = currentColor;
-    }
+// Add a new sun
+void Image::addSun(double x, double y, double z) {
+    Sun newSun;
     Vector d(x,y,z);
     d.normalize();
-    currentSun->direction = d;
-    currentSun->c = currentColor;
+    newSun.direction = d;
+    newSun.c = currentColor;
+    suns.push_back(newSun);
 }
 
-// Print the current sun
-void Image::printSun() {
-    if (currentSun != nullptr) {
-        std::cout << "Color: " << currentSun->c << std::endl;
-        std::cout << "Direction: " << std::endl;
-        currentSun->direction.print();
-    }
-}
+// // Print the current sun
+// void Image::printSun() {
+//     if (currentSun != nullptr) {
+//         std::cout << "Color: " << currentSun->c << std::endl;
+//         std::cout << "Direction: " << std::endl;
+//         currentSun->direction.print();
+//     }
+// }
+
+void Image::createBVH() { bvh = buildBVH(spheres.data(), 0, spheres.size()); }
 
 // Cast rays and draw the scene
 void Image::castRays() {
@@ -94,12 +94,12 @@ void Image::castRays() {
 // return the ray-sphere collision
 Intersection Image::getSphereCollision(const Ray &ray) const {
     Intersection intersection;
-    for (auto &object : objects) {
+    for (auto &object : spheres) {
         Vector diff(object.c - ray.origin);
         bool inside = std::pow(diff.mag(), 2.0) < std::pow(object.r, 2.0);
         double tc = dot(diff, ray.direction) / ray.direction.mag();
         if (!inside && tc < 0) continue;
-        Point d = ray.origin + tc * ray.direction.getVectorAsPoint() - object.c;
+        Point d = ray.origin + tc * ray.direction.getVectorPoint() - object.c;
         double d2 = std::pow(Vector(d).mag(), 2.0);
         if (!inside && std::pow(object.r, 2.0) < d2) continue;
         double tOffset = std::sqrt(std::pow(object.r, 2) - d2) / ray.direction.mag();
@@ -113,7 +113,7 @@ Intersection Image::getSphereCollision(const Ray &ray) const {
         }
     }
     if (intersection.found == true) 
-        intersection.p = intersection.t * ray.direction.getVectorAsPoint() + ray.origin;
+        intersection.p = intersection.t * ray.direction.getVectorPoint() + ray.origin;
     return intersection;
 }
 
@@ -129,45 +129,49 @@ void Image::convertLinearTosRGB(Color &c) {
     c.b = c.b <= factor ? 12.92 * c.b: 1.055 * std::pow(c.b, (1.0/2.4)) - 0.055;
 }
 
-// compute color with lambert shading
+// compute color with lambert shading for multiple suns
 void Image::computeColor(Vector& normal, Color& c, Point& p) {
-    if (currentSun != nullptr && !isInShadow(p)) {
-        Vector eyeDir(p - *eye);
-        eyeDir.normalize();
-        if (dot(eyeDir, normal) > 0.0)
-            normal = normal * -1;
-        currentSun->direction.normalize();
-        double lambert = std::max(dot(normal, currentSun->direction), 0.0);
-        c.r *= lambert * currentSun->c.r;
-        c.g *= lambert * currentSun->c.g;
-        c.b *= lambert * currentSun->c.b;
+    Color accumulatedColor{0.0, 0.0, 0.0};
+    for (auto& sun : suns) {
+        if (!isInShadow(p, sun)) {
+            Vector eyeDir(p - *eye);
+            eyeDir.normalize();
+            if (dot(eyeDir, normal) > 0.0)
+                normal = normal * -1;
+
+            sun.direction.normalize();
+            double lambert = std::max(dot(normal, sun.direction), 0.0);
+
+            accumulatedColor.r += lambert * sun.c.r;
+            accumulatedColor.g += lambert * sun.c.g;
+            accumulatedColor.b += lambert * sun.c.b;
+        }
     }
-    else {
-        c.r = 0.0;
-        c.g = 0.0;
-        c.b = 0.0;
-    }
+
+    c.r *= accumulatedColor.r;
+    c.g *= accumulatedColor.g;
+    c.b *= accumulatedColor.b;
 }
 
 // print the set of objects in the scene
-void Image::printObjects() {
-    for (auto &object : objects) {
-        std::cout << "Point: (";
-        std::cout << object.c.x << ", ";
-        std::cout << object.c.y << ", ";
-        std::cout << object.c.z << ")" << std::endl;
-        std::cout << "Radius: " << object.r << std::endl;
-        std::cout << "Color: (" << object.color.r << ", ";
-        std::cout << object.color.g << ", ";
-        std::cout << object.color.b << ")" << std::endl;
-    }
-}
+// void Image::printObjects() {
+//     for (auto &object : objects) {
+//         std::cout << "Point: (";
+//         std::cout << object.c.x << ", ";
+//         std::cout << object.c.y << ", ";
+//         std::cout << object.c.z << ")" << std::endl;
+//         std::cout << "Radius: " << object.r << std::endl;
+//         std::cout << "Color: (" << object.color.r << ", ";
+//         std::cout << object.color.g << ", ";
+//         std::cout << object.color.b << ")" << std::endl;
+//     }
+// }
 
-// check if a point is in shadow
-bool Image::isInShadow(const Point &intersection) {
+// check if a point is in shadow for a given sun
+bool Image::isInShadow(const Point &intersection, const Sun &sun) {
     constexpr double bias = 1e-6;
-    Vector biasVector = currentSun->direction * bias;
-    Ray shadowRay{intersection + biasVector.getVectorAsPoint(), currentSun->direction};
+    Vector biasVector = sun.direction * bias;
+    Ray shadowRay{intersection + biasVector.getVectorPoint(), sun.direction};
     Intersection i = getSphereCollision(shadowRay);
     return i.found;
 }
