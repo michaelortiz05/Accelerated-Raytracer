@@ -143,14 +143,14 @@ struct CUDA_HOSTDEV Intersection {
     Point center;
 };
 
-CUDA_HOSTDEV struct BoundingBox {
+// Simple boundign box for bvh nodes
+struct CUDA_HOSTDEV BoundingBox {
     Point minCorner, maxCorner;
 
     BoundingBox() 
         : minCorner{std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), std::numeric_limits<double>::max()}, 
           maxCorner{-std::numeric_limits<double>::max(), -std::numeric_limits<double>::max(), -std::numeric_limits<double>::max()} {}
 
-    // Expand the bounding box to include a sphere
     void expandToInclude(const Sphere& sphere) {
         minCorner.x = std::min(minCorner.x, sphere.c.x - sphere.r);
         minCorner.y = std::min(minCorner.y, sphere.c.y - sphere.r);
@@ -161,7 +161,6 @@ CUDA_HOSTDEV struct BoundingBox {
         maxCorner.z = std::max(maxCorner.z, sphere.c.z + sphere.r);
     }
 
-    // Check if a ray intersects the bounding box
     bool intersect(const Ray& ray, double& tMin, double& tMax) const {
         for (int i = 0; i < 3; ++i) {
             double invD = 1.0 / (i == 0 ? ray.direction.getX() : (i == 1 ? ray.direction.getY() : ray.direction.getZ()));
@@ -176,8 +175,8 @@ CUDA_HOSTDEV struct BoundingBox {
     }
 };
 
-
-CUDA_HOSTDEV struct BVHNode {
+// BVH tree node
+struct CUDA_HOSTDEV BVHNode {
     BoundingBox bbox;
     BVHNode* left;
     BVHNode* right;
@@ -197,6 +196,8 @@ BVHNode* CUDA_HOSTDEV buildBVH(Sphere* spheres, int start, int end, int depth = 
 double CUDA_HOSTDEV dot(const Vector& v1, const Vector& v2);
 Vector CUDA_HOSTDEV computeSphereNormal(const Point &p1, const Point &c);
 double CUDA_HOSTDEV clamp(double value, double min_value, double max_value);
+bool CUDA_HOSTDEV intersectSphere(Ray& ray, Sphere& sphere, Intersection& intersection);
+bool CUDA_HOSTDEV intersectBVH(const BVHNode* node, Ray& ray, Intersection& closestIntersection);
 inline Point CUDA_HOSTDEV  operator*(double scalar, const Point &p) {return Point{p.x * scalar, p.y * scalar, p.z * scalar};}
 
 #endif

@@ -73,20 +73,24 @@ void Image::addSun(double x, double y, double z) {
 void Image::createBVH() { bvh = buildBVH(spheres.data(), 0, spheres.size()); }
 
 // Cast rays and draw the scene
-void Image::castRays() {
+void Image::castRays() { 
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             double sx = (2.0 * x - width) / maxDim;
             double sy = (height - 2.0 * y) / maxDim;
             Vector direction = *forward + sx * *right + sy * *up;
             direction.normalize();
-            const Ray ray = Ray{*eye, direction};
-            Intersection intersection = getSphereCollision(ray);
-            if (intersection.found == true && intersection.t > 0.0) {
-                Vector normal = computeSphereNormal(intersection.p, intersection.center);
-                computeColor(normal, intersection.c, intersection.p);
-                colorPixel(x, y, intersection.c);
-            }
+            Ray ray = Ray{*eye, direction};
+            Intersection intersection;
+            if (!intersectBVH(bvh, ray, intersection)) continue;
+            Vector normal = computeSphereNormal(intersection.p, intersection.center);
+            computeColor(normal, intersection.c, intersection.p);
+            colorPixel(x, y, intersection.c);
+            // if (intersection.found == true && intersection.t > 0.0) {
+            //     Vector normal = computeSphereNormal(intersection.p, intersection.center);
+            //     computeColor(normal, intersection.c, intersection.p);
+            //     colorPixel(x, y, intersection.c);
+            // }
         }
     }
 }

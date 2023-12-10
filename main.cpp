@@ -82,6 +82,9 @@ int main(int argc, char *argv[]) {
         
     }
     // img->printObjects();
+    std::cout << "Building BVH..." << std::endl;
+    img->createBVH();
+    std::cout << "Rendering Scene..." << std::endl;
     img->castRays();
     if (img->getName() != "") {
         unsigned error = lodepng::encode(img->getName(), img->getPng(), img->getWidth(), img->getHeight());

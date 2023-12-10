@@ -40,7 +40,6 @@ void CUDA_HOSTDEV Vector::normalize() {
     if (mag == 0.0) {
         printf("Warning: Cannot normalize a zero vector\n");
     }
-
     p.x /= mag;
     p.y /= mag;
     p.z /= mag;
@@ -78,3 +77,49 @@ CUDA_HOSTDEV BVHNode* buildBVH(Sphere* spheres, int start, int end, int depth) {
 
     return node;
 }
+
+bool CUDA_HOSTDEV intersectSphere(Ray& ray, Sphere& sphere, Intersection& intersection) {
+    Vector diff(sphere.c - ray.origin);
+    bool inside = pow(diff.mag(), 2.0) < pow(sphere.r, 2.0);
+    double tc = dot(diff, ray.direction) / ray.direction.mag();
+    if (!inside && tc < 0) false;
+    Point d = ray.origin + tc * ray.direction.getVectorPoint() - sphere.c;
+    double d2 = pow(Vector(d).mag(), 2.0);
+    if (!inside && pow(sphere.r, 2.0) < d2) return false;
+    double tOffset = sqrt(pow(sphere.r, 2) - d2) / ray.direction.mag();
+    double t = 0.0;
+    intersection.found = true;
+    t = inside ? tc + tOffset : tc - tOffset;
+    if (t < intersection.t) {
+        intersection.t = t;
+        intersection.c = sphere.color;
+        intersection.center = sphere.c;
+    }
+    if (intersection.found == true) 
+        intersection.p = intersection.t * ray.direction.getVectorPoint() + ray.origin;
+    return intersection.found == true && intersection.t > 0.0;
+}
+
+CUDA_HOSTDEV bool intersectBVH(const BVHNode* node, Ray& ray, Intersection& closestIntersection) {
+    if (node == nullptr) return false;
+
+    double tMin = 0.0, tMax = DBL_MAX;
+    if (!node->bbox.intersect(ray, tMin, tMax)) {
+        return false; 
+    }
+
+    if (node->isLeaf()) {
+        bool hit = false;
+        for (int i = 0; i < node->sphereCount; ++i) {
+            if (intersectSphere(ray, node->spheres[i], closestIntersection)) {
+                hit = true;
+            }
+        }
+        return hit;
+    } else {
+        bool hitLeft = intersectBVH(node->left, ray, closestIntersection);
+        bool hitRight = intersectBVH(node->right, ray, closestIntersection);
+        return hitLeft || hitRight;
+    }
+}
+
